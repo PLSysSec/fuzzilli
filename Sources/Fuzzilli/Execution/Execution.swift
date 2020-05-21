@@ -80,7 +80,10 @@ public struct Execution {
     
     /// Program output (not stdout but FuzzIL output)
     public let output: String
-    
+
+    /// Any error resulting from the execution (e.g., Verifirefox error)
+    public let errput : String
+
     /// Execution time in ms
     public let execTime: UInt
 }

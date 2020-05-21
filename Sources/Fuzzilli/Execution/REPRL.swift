@@ -35,6 +35,8 @@ public class REPRL: ComponentBase, ScriptRunner {
     private var drfd: CInt = 0
     /// Write file descriptor of the data pipe
     private var dwfd: CInt = 0
+    // Read file descriptor of the standard error pipe
+    private var erfd: CInt = 0
     
     /// Environment variables for the child process
     private var env = [String]()
@@ -111,6 +113,7 @@ public class REPRL: ComponentBase, ScriptRunner {
         cwfd = child.cwfd
         drfd = child.drfd
         dwfd = child.dwfd
+	erfd = child.erfd
         
         execsSinceReset = 0
     }
@@ -126,7 +129,7 @@ public class REPRL: ComponentBase, ScriptRunner {
         
         let code = script.data(using: .utf8)!
         let res = code.withUnsafeBytes { (body: UnsafeRawBufferPointer) -> CInt in
-            return reprl_execute_script(pid, crfd, cwfd, drfd, dwfd, CInt(timeout), body.bindMemory(to: Int8.self).baseAddress, Int64(code.count), &result)
+            return reprl_execute_script(pid, crfd, cwfd, drfd, dwfd, erfd, CInt(timeout), body.bindMemory(to: Int8.self).baseAddress, Int64(code.count), &result)
         }
         
         if res != 0 {
@@ -139,14 +142,17 @@ public class REPRL: ComponentBase, ScriptRunner {
         if result.child_died != 0 {
             respawn(shouldKill: false)
         }
-        
+
+        let errput = String(data: Data(bytes: result.errput, count: result.errput_size), encoding: .utf8)!
         let output = String(data: Data(bytes: result.output, count: result.output_size), encoding: .utf8)!
+
         free(result.output)
         
         return Execution(pid: Int(pid),
                          outcome: ExecutionOutcome.fromExitStatus(result.status),
                          termsig: Int(WTERMSIG(result.status)),
                          output: output,
+			 errput: errput,
                          execTime: UInt(result.exec_time))
     }
 }

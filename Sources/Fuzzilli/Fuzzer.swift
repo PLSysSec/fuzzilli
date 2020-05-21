@@ -257,6 +257,7 @@ public class Fuzzer {
     ///   - timeout: The timeout after which to abort execution. If nil, the default timeout of this fuzzer will be used.
     /// - Returns: An Execution structure representing the execution outcome.
     public func execute(_ program: Program, withTimeout timeout: UInt32? = nil) -> Execution {
+
         assert(runner.isInitialized)
         assert(OperationQueue.current == queue)
         

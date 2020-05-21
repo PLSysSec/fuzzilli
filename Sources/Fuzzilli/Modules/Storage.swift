@@ -50,6 +50,7 @@ public class Storage: Module {
         }
 
         fuzzer.events.CrashFound.observe { ev in
+
             let filename = "crash_\(String(currentMillis()))_\(ev.pid)_\(ev.behaviour.rawValue)_\(ev.signal).js"
             let fileURL: URL
             if ev.isUnique {
@@ -57,15 +58,17 @@ public class Storage: Module {
             } else {
                 fileURL = URL(fileURLWithPath: "\(self.duplicateCrashesDir)/\(filename)")
             }
+	    print(ev)
             let code = fuzzer.lifter.lift(ev.program)
-            self.storeProgram(code, to: fileURL)
+            self.storeProgram(code, ev.errput, to: fileURL)
+
         }
 
         fuzzer.events.InterestingProgramFound.observe { ev in
             let filename = "sample_\(String(currentMillis())).js"
             let fileURL = URL(fileURLWithPath: "\(self.interestingDir)/\(filename)")
             let code = fuzzer.lifter.lift(ev.program, withOptions: .dumpTypes)
-            self.storeProgram(code, to: fileURL)
+            self.storeProgram(code, "", to: fileURL)
         }
 
         // If enabled, export the current fuzzer state to disk in regular intervals.
@@ -75,9 +78,10 @@ public class Storage: Module {
         }
     }
 
-    private func storeProgram(_ code: String, to url: URL) {
+    private func storeProgram(_ code: String, _ errput : String, to url: URL) {
         do {
-            try code.write(to: url, atomically: false, encoding: String.Encoding.utf8)
+            let final = code + "\n\n/*\n\n" + errput + "\n\n*/\n"
+            try final.write(to: url, atomically: false, encoding: String.Encoding.utf8)
         } catch {
             logger.error("Failed to write program to disk: \(error)")
         }

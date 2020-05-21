@@ -26,6 +26,8 @@ struct reprl_child_process {
     int drfd;
     // Write file descriptor of the data pipe.
     int dwfd;
+    // Read fd for child's stderr.
+    int erfd;
     // PID of the child process.
     int pid;
 };
@@ -36,12 +38,14 @@ struct reprl_result {
     unsigned long exec_time;
     char* output;
     size_t output_size;
+    char* errput;
+    size_t errput_size;
 };
 
 // Spawn a child process implementing the REPRL protocol.
 int reprl_spawn_child(char** argv, char** envp, struct reprl_child_process* child);
 
 // Execute the provided script in the child process, wait for its completion, and return the result.
-int reprl_execute_script(int pid, int crfd, int cwfd, int drfd, int dwfd, int timeout, const char* script, int64_t script_length, struct reprl_result* result);
+int reprl_execute_script(int pid, int crfd, int cwfd, int drfd, int dwfd, int erfd, int timeout, const char* script, int64_t script_length, struct reprl_result* result);
 
 #endif

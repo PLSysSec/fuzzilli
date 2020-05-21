@@ -78,6 +78,7 @@ public class Forkserver: ComponentBase, ScriptRunner {
                          outcome: ExecutionOutcome.fromExitStatus(result.status),
                          termsig: Int(WTERMSIG(result.status)),
                          output: output,
+			 errput: "", 
                          execTime: UInt(result.exec_time))
     }
 }

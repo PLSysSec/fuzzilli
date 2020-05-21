@@ -152,9 +152,9 @@ public class FuzzerCore: ComponentBase {
             }
     
             fuzzer.events.ProgramGenerated.dispatch(with: program)
-            
+
             let execution = fuzzer.execute(program)
-            
+
             switch execution.outcome {
             case .crashed:
                 processCrash(program, withSignal: execution.termsig, ofProcess: execution.pid, isImported: false)
@@ -213,7 +213,7 @@ public class FuzzerCore: ComponentBase {
         }
 
         if !didCrash && isCrash {
-            fuzzer.events.CrashFound.dispatch(with: (program, .flaky, 0, 0, true, true))
+            fuzzer.events.CrashFound.dispatch(with: (program, execution.errput, .flaky, 0, 0, true, true))
         }
     }
 
@@ -233,9 +233,9 @@ public class FuzzerCore: ComponentBase {
         let execution = fuzzer.execute(minimizedProgram, withTimeout: fuzzer.config.timeout * 2)
         if execution.outcome == .crashed {
             let isUnique = fuzzer.evaluator.evaluateCrash(execution) != nil
-            fuzzer.events.CrashFound.dispatch(with: (minimizedProgram, .deterministic, termsig, pid, isUnique, isImported))
+            fuzzer.events.CrashFound.dispatch(with: (minimizedProgram, execution.errput, .deterministic, termsig, pid, isUnique, isImported))
         } else {
-            fuzzer.events.CrashFound.dispatch(with: (minimizedProgram, .flaky, termsig, pid, true, isImported))
+            fuzzer.events.CrashFound.dispatch(with: (minimizedProgram, execution.errput, .flaky, termsig, pid, true, isImported))
         }
     }
     

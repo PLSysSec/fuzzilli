@@ -60,17 +60,20 @@ int reprl_spawn_child(char** argv, char** envp, struct reprl_child_process* chil
     int cwpipe[2] = { 0, 0 };          // control channel fuzzer -> child
     int drpipe[2] = { 0, 0 };          // data channel child -> fuzzer
     int dwpipe[2] = { 0, 0 };          // data channel fuzzer -> child
+    int erpipe[2] = { 0, 0 }; // stderr child -> fuzzer
 
     int res = 0;
     res |= pipe(crpipe);
     res |= pipe(cwpipe);
     res |= pipe(drpipe);
     res |= pipe(dwpipe);
+    res |= pipe(erpipe);
     if (res != 0) {
         if (crpipe[0] != 0) { close(crpipe[0]); close(crpipe[1]); }
         if (cwpipe[0] != 0) { close(cwpipe[0]); close(cwpipe[1]); }
         if (drpipe[0] != 0) { close(drpipe[0]); close(drpipe[1]); }
         if (dwpipe[0] != 0) { close(dwpipe[0]); close(dwpipe[1]); }
+	if (erpipe[0] != 0) { close(erpipe[0]); close(erpipe[1]); }
         fprintf(stderr, "[REPRL] Could not setup pipes for communication with child: %s\n", strerror(errno));
         return -1;
     }
@@ -79,15 +82,19 @@ int reprl_spawn_child(char** argv, char** envp, struct reprl_child_process* chil
     child->cwfd = cwpipe[1];
     child->drfd = drpipe[0];
     child->dwfd = dwpipe[1];
+    child->erfd = erpipe[0];
 
     int flags;
     flags = fcntl(child->drfd, F_GETFL, 0);
     fcntl(child->drfd, F_SETFL, flags | O_NONBLOCK);
+    flags = fcntl(child->erfd, F_GETFL, 0);
+    fcntl(child->erfd, F_SETFL, flags | O_NONBLOCK);
     
     fcntl(child->crfd, F_SETFD, FD_CLOEXEC);
     fcntl(child->cwfd, F_SETFD, FD_CLOEXEC);
     fcntl(child->drfd, F_SETFD, FD_CLOEXEC);
     fcntl(child->dwfd, F_SETFD, FD_CLOEXEC);
+    fcntl(child->erfd, F_SETFD, FD_CLOEXEC);
 
     int pid = fork();
     if (pid == 0) {
@@ -99,11 +106,14 @@ int reprl_spawn_child(char** argv, char** envp, struct reprl_child_process* chil
         close(crpipe[1]);
         close(dwpipe[0]);
         close(drpipe[1]);
+
+	// make fd2 the write side of the erpipe
+        dup2(erpipe[1], 2);
+	close(erpipe[1]);
         
         int devnull = open("/dev/null", O_RDWR);
         dup2(devnull, 0);
         dup2(devnull, 1);
-        dup2(devnull, 2);
         close(devnull);
 
         execve(argv[0], argv, envp);
@@ -118,6 +128,7 @@ int reprl_spawn_child(char** argv, char** envp, struct reprl_child_process* chil
     close(cwpipe[0]);
     close(drpipe[1]);
     close(dwpipe[0]);
+    close(erpipe[1]);
     
     child->pid = pid;
 
@@ -128,6 +139,7 @@ int reprl_spawn_child(char** argv, char** envp, struct reprl_child_process* chil
         close(child->cwfd);
         close(child->drfd);
         close(child->dwfd);
+	close(child->erfd);
         int status;
         kill(pid, SIGKILL);
         waitpid(pid, &status, 0);
@@ -143,7 +155,11 @@ static char* fetch_output(int fd, size_t* outsize)
     *outsize = 0;
     size_t remaining = 0x1000;
     char* outbuf = malloc(remaining + 1);
-    
+    if (!outbuf) {
+        fprintf(stderr, "[REPRL] Could not allocate errput buffer");
+        _exit(-1);
+    }
+
     do {
         rv = read(fd, outbuf + *outsize, remaining);
         if (rv == -1) {
@@ -172,7 +188,8 @@ static char* fetch_output(int fd, size_t* outsize)
 }
 
 // Execute one script, wait for its completion, and return the result.
-int reprl_execute_script(int pid, int crfd, int cwfd, int drfd, int dwfd, int timeout, const char* script, int64_t script_length, struct reprl_result* result)
+/* adjust this function signature */
+int reprl_execute_script(int pid, int crfd, int cwfd, int drfd, int dwfd, int erfd, int timeout, const char* script, int64_t script_length, struct reprl_result* result)
 {
     uint64_t start_time = current_millis();
 
@@ -210,6 +227,14 @@ int reprl_execute_script(int pid, int crfd, int cwfd, int drfd, int dwfd, int ti
     }
 
     result->output = fetch_output(drfd, &result->output_size);
+    result->errput = fetch_output(erfd, &result->errput_size);
+    /*
+    result->errput_size = 6;
+    result->errput = malloc(6*sizeof(char));
+    strncpy(result->errput, "Hello", 6);
+    */
+    
+    /* new function that reads from stderr */
     result->exec_time = current_millis() - start_time;
     
     return 0;

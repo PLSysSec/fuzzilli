@@ -36,6 +36,7 @@ public struct AbstractInterpreter {
     
     /// Abstractly execute the given instruction, thus updating type information.
     public mutating func execute(_ instr: Instruction) {
+
         switch instr.operation {
         case is BeginFunctionDefinition:
             stack.append(currentState)
