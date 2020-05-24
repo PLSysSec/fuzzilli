@@ -147,6 +147,7 @@ public class REPRL: ComponentBase, ScriptRunner {
         let output = String(data: Data(bytes: result.output, count: result.output_size), encoding: .utf8)!
 
         free(result.output)
+	free(result.errput)
         
         return Execution(pid: Int(pid),
                          outcome: ExecutionOutcome.fromExitStatus(result.status),
